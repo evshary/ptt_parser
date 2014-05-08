@@ -38,15 +38,11 @@ class MyArticleParser(HTMLParser):
 		self.users = {"authors":{},"pushers":{}}
 		self.name_flag = 0
 		self.year_flag = 0
+		self.topic = 0
 
 	def handle_starttag(self, tag, attrs):
 		if tag == "span" and ("class","f3 hl push-userid") in attrs:
 			self.name_flag = 1
-		#elif tag == "span" and ("class","article-meta-value") in attrs:
-		#	self.name_flag = 2
-
-	#def handle_endtag(self, tag):
-	#	print "End Tag:", tag
 
 	def handle_data(self, data):
 		if self.name_flag == 1:
@@ -62,15 +58,17 @@ class MyArticleParser(HTMLParser):
 			except:
 				self.users["authors"][data] = 1
 			self.name_flag = 0
+
 		if self.year_flag == 1:
+			self.topic = 1
 			if "2014" not in data:
 				self.year_flag = -1
 			else:
 				self.year_flag = 0
 
-		if data == u"作者":
+		if data == u"作者" and self.topic == 0:
 			self.name_flag = 2
-		elif data == u"時間":
+		elif data == u"時間" and self.topic == 0:
 			self.year_flag = 1
 
 def main():
@@ -103,7 +101,7 @@ def main():
 				while True:
 					try:
 						bbsURL = BaseURL+article
-						#print bbsURL
+						print bbsURL
 						htmlSrc = urllib2.urlopen(urllib2.Request(bbsURL)).read()
 						htmlSrc = htmlSrc.decode('utf-8')
 						ArticleParser.feed(htmlSrc)
@@ -117,7 +115,7 @@ def main():
 				if ArticleParser.year_flag == -1:
 					break
 			users_name = ArticleParser.users
-			print users_name
+			#print users_name
 			if ArticleParser.year_flag == -1:
 				break
 		ArticleParser.close()
