@@ -38,11 +38,14 @@ class MyArticleParser(HTMLParser):
 		self.users = {"authors":{},"pushers":{}}
 		self.name_flag = 0
 		self.year_flag = 0
-		self.topic = 0
+		self.meta_flag = 0
 
 	def handle_starttag(self, tag, attrs):
+		self.meta_flag = 0
 		if tag == "span" and ("class","f3 hl push-userid") in attrs:
 			self.name_flag = 1
+		elif tag == "span" and ("class","article-meta-value") in attrs:
+			self.meta_flag = 1
 
 	def handle_data(self, data):
 		if self.name_flag == 1:
@@ -60,15 +63,14 @@ class MyArticleParser(HTMLParser):
 			self.name_flag = 0
 
 		if self.year_flag == 1:
-			self.topic = 1
 			if "2014" not in data:
 				self.year_flag = -1
 			else:
 				self.year_flag = 0
 
-		if data == u"作者" and self.topic == 0:
+		if data == u"作者" and self.meta_flag == 1:
 			self.name_flag = 2
-		elif data == u"時間" and self.topic == 0:
+		elif data == u"時間" and self.meta_flag == 1:
 			self.year_flag = 1
 
 def main():
@@ -99,15 +101,17 @@ def main():
 			for article in links:
 				try_count = 0
 				while True:
+					bbsURL = BaseURL+article
+					print bbsURL
 					try:
-						bbsURL = BaseURL+article
-						print bbsURL
 						htmlSrc = urllib2.urlopen(urllib2.Request(bbsURL)).read()
 						htmlSrc = htmlSrc.decode('utf-8')
 						ArticleParser.feed(htmlSrc)
 						break
 					except:
 						if try_count > 5:
+							with open("log.txt", "a") as logfile:
+								logfile.write(bbsURL)
 							break
 						else:
 							try_count += 1
