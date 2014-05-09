@@ -4,6 +4,7 @@
 from HTMLParser import HTMLParser
 import urllib2
 import pdb
+import MySQLdb
 
 BaseURL = "http://www.ptt.cc"
 
@@ -35,7 +36,7 @@ class MyBoardParser(HTMLParser):
 class MyArticleParser(HTMLParser):
 	def __init__(self):
 		HTMLParser.__init__(self)
-		self.users = {"authors":{},"pushers":{}}
+		self.users = {}
 		self.name_flag = 0
 		self.year_flag = 0
 		self.meta_flag = 0
@@ -48,17 +49,17 @@ class MyArticleParser(HTMLParser):
 		#Get the pushers
 		if self.name_flag == 1:
 			try:
-				self.users["pushers"][data] += 1
+				self.users[data][1] += 1
 			except:
-				self.users["pushers"][data] = 1
+				self.users[data] = [0,1]
 			self.name_flag = 0
 		#Get the author
 		elif self.name_flag == 2:
 			data = data.split(" ")[0]
 			try:
-				self.users["authors"][data] += 1
+				self.users[data][0] += 1
 			except:
-				self.users["authors"][data] = 1
+				self.users[data] = [1,0]
 			self.name_flag = 0
 		#Get the time
 		if self.year_flag == 1:
@@ -77,7 +78,7 @@ def main():
 	global BaseURL
 	file_handle = open("board.txt", "r")
 	for board in file_handle:
-		users_name = {}
+		board_users = {}
 		page = "/bbs/"+board.strip()+"/index.html"
 		ArticleParser = MyArticleParser()
 		while True:
@@ -119,11 +120,27 @@ def main():
 						continue
 				if ArticleParser.year_flag == -1:
 					break
-			users_name = ArticleParser.users
-			#print users_name
 			if ArticleParser.year_flag == -1:
 				break
+		board_users = ArticleParser.users
 		ArticleParser.close()
+			
+		#write into db
+		with open("db_info", "r") as db_info:
+			db_host = db_info.readline()
+			db_user = db_info.readline()
+			db_pass = db_info.readline()
+			db_name = db_info.readline()
+		db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_name)
+		cursor = db.cursor()
+		cursor.execute("CREATE TABLE "+board+" (user VARCHAR(20), article_count INT(5), push_count INT(5));")
+		db.commit()
+		for user_name in board_users:
+			(article_count,push_count) = board_users[user_name]
+			cursor.execute("INSERT INTO "+board+"(user, article_count, push_count) values ('"+user_name+"','"+article_count+"','"+push_count+"'")	
+		db.commit()
+		cursor.close()
+		db.close()
 	file_handle.close()
 
 if __name__ == '__main__':
