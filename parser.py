@@ -46,21 +46,6 @@ class MyArticleParser(HTMLParser):
 			self.name_flag = 1
 
 	def handle_data(self, data):
-		#Get the pushers
-		if self.name_flag == 1:
-			try:
-				self.users[data][1] += 1
-			except:
-				self.users[data] = [0,1]
-			self.name_flag = 0
-		#Get the author
-		elif self.name_flag == 2:
-			data = data.split(" ")[0]
-			try:
-				self.users[data][0] += 1
-			except:
-				self.users[data] = [1,0]
-			self.name_flag = 0
 		#Get the time
 		if self.year_flag == 1:
 			self.meta_flag = 0
@@ -69,11 +54,28 @@ class MyArticleParser(HTMLParser):
 			else:
 				self.year_flag = 0
 
-		if data == u"作者" and self.meta_flag == 1:
-			self.name_flag = 2
-		elif data == u"時間" and self.meta_flag == 1:
-			self.year_flag = 1
-
+		if self.year_flag != -1:
+			#Get the pushers
+			if self.name_flag == 1:
+				try:
+					self.users[data][1] += 1
+				except:
+					self.users[data] = [0,1]
+				self.name_flag = 0
+			#Get the author
+			elif self.name_flag == 2:
+				data = data.split(" ")[0]
+				try:
+					self.users[data][0] += 1
+				except:
+					self.users[data] = [1,0]
+				self.name_flag = 0
+	
+			if data == u"作者" and self.meta_flag == 1:
+				self.name_flag = 2
+			elif data == u"時間" and self.meta_flag == 1:
+				self.year_flag = 1
+	
 def main():
 	global BaseURL
 	file_handle = open("board.txt", "r")
@@ -83,6 +85,7 @@ def main():
 		ArticleParser = MyArticleParser()
 		while True:
 			links = []
+			count_2013 = 0
 			#Parse Index
 			bbsURL = BaseURL+page
 			print bbsURL
@@ -101,6 +104,7 @@ def main():
 			#Parse Article	
 			for article in links:
 				try_count = 0
+				#try to access the article
 				while True:
 					bbsURL = BaseURL+article
 					print bbsURL
@@ -119,7 +123,11 @@ def main():
 							try_count += 1
 						continue
 				if ArticleParser.year_flag == -1:
-					break
+					if count_2013 != 19:
+						ArticleParser.year_flag = 0
+						count_2013 += 1
+					else:
+						break
 			if ArticleParser.year_flag == -1:
 				break
 		board_users = ArticleParser.users
@@ -127,17 +135,17 @@ def main():
 			
 		#write into db
 		with open("db_info", "r") as db_info:
-			db_host = db_info.readline()
-			db_user = db_info.readline()
-			db_pass = db_info.readline()
-			db_name = db_info.readline()
+			db_host = db_info.readline().strip()
+			db_user = db_info.readline().strip()
+			db_pass = db_info.readline().strip()
+			db_name = db_info.readline().strip()
 		db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_name)
 		cursor = db.cursor()
 		cursor.execute("CREATE TABLE "+board+" (user VARCHAR(20), article_count INT(5), push_count INT(5));")
 		db.commit()
 		for user_name in board_users:
 			(article_count,push_count) = board_users[user_name]
-			cursor.execute("INSERT INTO "+board+"(user, article_count, push_count) values ('"+user_name+"','"+article_count+"','"+push_count+"'")	
+			cursor.execute("INSERT INTO "+board+" (user, article_count, push_count) values ('"+user_name+"',"+str(article_count)+","+str(push_count)+");")	
 		db.commit()
 		cursor.close()
 		db.close()
