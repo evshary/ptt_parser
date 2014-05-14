@@ -44,6 +44,11 @@ class MyArticleParser(HTMLParser):
 	def handle_starttag(self, tag, attrs):
 		if tag == "span" and ("class","f3 hl push-userid") in attrs:
 			self.name_flag = 1
+	
+	def handle_endtag(self, tag):
+		#push-userid flag should be unset
+		if tag == "span" and self.name_flag == 1:
+			self.name_flag = 0
 
 	def handle_data(self, data):
 		#Get the time
@@ -53,15 +58,15 @@ class MyArticleParser(HTMLParser):
 				self.year_flag = -1
 			else:
 				self.year_flag = 0
-
-		if self.year_flag != -1:
+		data = data.strip()
+		#If the article is not in 2014, neglect it
+		if self.year_flag != -1 and data != '':
 			#Get the pushers
 			if self.name_flag == 1:
 				try:
 					self.users[data][1] += 1
 				except:
 					self.users[data] = [0,1]
-				self.name_flag = 0
 			#Get the author
 			elif self.name_flag == 2:
 				data = data.split(" ")[0]
@@ -80,8 +85,9 @@ def main():
 	global BaseURL
 	file_handle = open("board.txt", "r")
 	for board in file_handle:
+		board = board.strip()
 		board_users = {}
-		page = "/bbs/"+board.strip()+"/index.html"
+		page = "/bbs/"+board+"/index.html"
 		ArticleParser = MyArticleParser()
 		while True:
 			links = []
@@ -141,11 +147,18 @@ def main():
 			db_name = db_info.readline().strip()
 		db = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_name)
 		cursor = db.cursor()
-		cursor.execute("CREATE TABLE "+board+" (user VARCHAR(20), article_count INT(5), push_count INT(5));")
+		cursor.execute("CREATE TABLE `"+board+"` (user VARCHAR(20), article_count INT(5), push_count INT(5));")
 		db.commit()
 		for user_name in board_users:
 			(article_count,push_count) = board_users[user_name]
-			cursor.execute("INSERT INTO "+board+" (user, article_count, push_count) values ('"+user_name+"',"+str(article_count)+","+str(push_count)+");")	
+			try:
+				sql = u"INSERT INTO `"+board+"` (user, article_count, push_count) values (%s,"+str(article_count)+","+str(push_count)+");"	
+				cursor.execute(sql, user_name)
+			except:
+				continue
+				#pdb.set_trace()
+				#with open("error.txt", "w") as error_log:
+				#	error_log.write(sql % user_name)
 		db.commit()
 		cursor.close()
 		db.close()
